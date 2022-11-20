@@ -11,8 +11,10 @@ const AppSvg = () => {
     const [mapElement, setMap] = useState(null)
     const [polygonElements, setPolygons] = useState(null)
     const [pathGenerator, setPathGenerator] = useState(null)
+    const [hovered, setHovered] = useState(null)
 
     useEffect(() => {
+        console.log('effect')
         L = require('leaflet')
         // Map creation
         if (!mapElement) {
@@ -62,7 +64,7 @@ const AppSvg = () => {
                 const g = svg.append('g')
 
                 // Création des polygons
-                const polygons = g
+                const polygons = svg
                     .selectAll('path')
                     .data(data.features)
                     .enter()
@@ -70,7 +72,26 @@ const AppSvg = () => {
                     .attr('d', (feature) => pathGenerator(feature)) // d = svp path string encoded
                     .attr('stroke', 'black')
                     .attr('fill', 'none')
-                //setPolygons(polygons)
+                    .attr('style', 'pointer-events: visible')
+                    .attr('id', function (d) {
+                        return d.id
+                    })
+                    .on('mouseover', function (e, d) {
+                        d3.select(this)
+                            .style('fill', d3.select(this).attr('stroke'))
+                            .attr('fill-opacity', 0.3)
+
+                        if (!hovered || hovered.id !== d.id) {
+                            setHovered(d)
+                        }
+                    })
+                    .on('mouseout', function (d) {
+                        d3.select(this)
+                            .style('fill', 'none')
+                            .attr('fill-opacity', 1)
+                    })
+
+                setPolygons(polygons)
 
                 // Recalage de la taille du svg s'il n'en a pas
                 /*
@@ -107,7 +128,23 @@ const AppSvg = () => {
                     zIndex: 0,
                 }}
                 id="map"
-            ></div>
+            >
+                <span
+                    style={{
+                        position: 'absolute',
+                        top: 30,
+                        left: 50,
+                        zIndex: 3000,
+                        fontWeight: 'bold',
+                        color: 'red',
+                    }}
+                >
+                    {(() => {
+                        //console.log(hovered)
+                        return hovered && `Hovered: ${hovered.id}`
+                    })()}
+                </span>
+            </div>
         </div>
     )
 }
