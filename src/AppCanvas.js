@@ -3,8 +3,8 @@ import 'leaflet/dist/leaflet.css'
 import * as d3 from 'd3'
 var L = null
 
-const source = require('./data/aocAlsace.geojson')
-//const source = require('./data/states-us.geojson')
+//const source = require('./data/aocAlsace.geojson')
+const source = require('./data/states-us.geojson')
 
 const AppCanvas = () => {
     const [mapElement, setMap] = useState(null)

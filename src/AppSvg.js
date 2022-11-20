@@ -3,8 +3,8 @@ import 'leaflet/dist/leaflet.css'
 import * as d3 from 'd3'
 var L = null
 
-const source = require('./data/aocAlsace.geojson')
-//const source = require('./data/states-us.geojson')
+//const source = require('./data/aocAlsace.geojson')
+const source = require('./data/states-us.geojson')
 
 const AppSvg = () => {
     // https://bost.ocks.org/mike/leaflet/
@@ -68,6 +68,8 @@ const AppSvg = () => {
                     .enter()
                     .append('path')
                     .attr('d', (feature) => pathGenerator(feature)) // d = svp path string encoded
+                    .attr('stroke', 'black')
+                    .attr('fill', 'none')
                 //setPolygons(polygons)
 
                 // Recalage de la taille du svg s'il n'en a pas
