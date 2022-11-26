@@ -3,8 +3,8 @@ import 'leaflet/dist/leaflet.css'
 import * as d3 from 'd3'
 var L = null
 
-//const source = require('./data/aocAlsace.geojson')
-const source = require('./data/states-us.geojson')
+const source = require('./data/aocAlsace.geojson')
+//const source = require('./data/states-us.geojson')
 
 const AppSvg = () => {
     // https://bost.ocks.org/mike/leaflet/
@@ -14,7 +14,6 @@ const AppSvg = () => {
     const [hovered, setHovered] = useState(null)
 
     useEffect(() => {
-        console.log('effect')
         L = require('leaflet')
         // Map creation
         if (!mapElement) {
@@ -140,8 +139,9 @@ const AppSvg = () => {
                     }}
                 >
                     {(() => {
-                        //console.log(hovered)
-                        return hovered && `Hovered: ${hovered.id}`
+                        return (
+                            hovered && `Hovered: ${hovered.properties.nomcom}`
+                        )
                     })()}
                 </span>
             </div>
