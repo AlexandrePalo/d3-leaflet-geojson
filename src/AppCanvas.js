@@ -8,11 +8,145 @@ var L = null
 const source = require('./data/states-us.geojson')
 
 const AppCanvas = () => {
+    // App rerenders when a state change
     const [mapElement, setMap] = useState(null)
+    const [data, setData] = useState([])
+    //const [pathElements, setPathElements] = useState([])
     const [hovered, setHovered] = useState(null)
+    // Path2D elements collections for canvas interaction
+    var path2DElements = []
 
     useEffect(() => {
         L = require('leaflet')
+
+        // Drawing function
+        function drawCanvas() {
+            if (!mapElement) {
+                return
+            }
+
+            const canvas = d3.select('#map').select('canvas')
+
+            // Transformation (overal projection) for points on map
+            // Defined for the map at this instant, must be recalculated everytime
+            const projection = d3.geoTransform({
+                point: function (x, y) {
+                    // Project M(x, y) to the map
+                    const point = mapElement.latLngToLayerPoint(
+                        new L.LatLng(y, x)
+                    )
+                    this.stream.point(point.x, point.y) // this : NO ARROW FUNCTION
+                },
+            })
+            const context = canvas.node().getContext('2d')
+            // Path generator, generate path function according to geoJson
+            // transformation, no context => svg
+            // as we'll use the svg to draw on canvas after
+            const path = d3.geoPath().projection(projection)
+            //.context(context)
+
+            // Regenerate path2DElements
+            path2DElements = []
+            data.forEach(function (d) {
+                // Create path
+                // without context, path(d) is an svg path
+                // need to render it as a canvas path
+                path2DElements.push({
+                    path2D: generatePath2D(d, path),
+                    feature: d,
+                    draw: {
+                        strokeStyle: 'rgb(0,0,0)',
+                        fillStyle:
+                            hovered && d.id === hovered.id
+                                ? 'rgba(0,0,0,0.3)'
+                                : 'transparent',
+                    },
+                })
+            })
+
+            // Clear current canvas
+            context.clearRect(
+                0,
+                0,
+                mapElement.getSize().x,
+                mapElement.getSize().y
+            )
+
+            // Redraw path2DElements
+            path2DElements.forEach((p) => {
+                context.strokeStyle = p.draw.strokeStyle
+                context.stroke(p.path2D)
+                context.fillStyle = p.draw.fillStyle
+                context.fill(p.path2D)
+            })
+        }
+
+        // Data or map changed, rerender
+        if (mapElement && data) {
+            console.log('General re-render')
+
+            // Remove all layers, except tile layer
+            mapElement.eachLayer((layer) => {
+                !layer
+                    .getPane()
+                    .getAttribute('class')
+                    .includes('leaflet-tile-pane') &&
+                    mapElement.removeLayer(layer)
+            })
+            // Create / recreate canvas
+            const canvasLayer = L.canvas().addTo(mapElement)
+            const canvas = d3.select('#map').select('canvas')
+
+            // Draw / redraw canvas
+            drawCanvas()
+
+            // Define / redefine the update method
+            canvasLayer.on('update', (e) => {
+                console.log('update')
+
+                const context = canvas.node().getContext('2d')
+                context.save()
+                context.clearRect(
+                    0,
+                    0,
+                    mapElement.getSize().x,
+                    mapElement.getSize().y
+                )
+                //generateCustoms(data)
+                drawCanvas()
+                context.restore()
+            })
+
+            // Define / redefine interactions
+            // Handle mousemove
+            canvas.on('mousemove', (e) => {
+                // TODO : check when map isn't at top left
+                //let bound = canvas.node().getBoundingClientRect() // in case canvas is not at top left
+                //let x = e.pageX - bound.left
+                //let y = e.pageY - bound.top
+                const context = canvas.node().getContext('2d')
+
+                var currentHovered = null
+                for (let i = 0; i < path2DElements.length; i++) {
+                    const d = path2DElements[i]
+                    if (
+                        context.isPointInPath(
+                            transformPath2DWithCanvasStyle(
+                                d.path2D,
+                                canvas.attr('style'),
+                                canvas.attr('width')
+                            ),
+                            mapElement.mouseEventToLayerPoint(e).x,
+                            mapElement.mouseEventToLayerPoint(e).y
+                        )
+                    ) {
+                        currentHovered = d.feature
+                        break
+                    }
+                }
+                setHovered(currentHovered) // null or defined
+            })
+        }
 
         // Map creation
         if (!mapElement) {
@@ -29,123 +163,17 @@ const AppCanvas = () => {
 
             map.whenReady(() => {
                 // Create canvas element to the correct size
-                const canvasLayer = L.canvas().addTo(map)
+                //const canvasLayer = L.canvas().addTo(map)
                 const canvas = d3.select('#map').select('canvas')
-
-                // Transformation (overal projection) for points on map
-                // Defined for the map at this instant, must be recalculated everytime
-                const projection = d3.geoTransform({
-                    point: function (x, y) {
-                        // Project M(x, y) to the map
-                        const point = map.latLngToLayerPoint(new L.LatLng(y, x))
-                        this.stream.point(point.x, point.y) // this : NO ARROW FUNCTION
-                    },
-                })
-                const context = canvas.node().getContext('2d')
-                // Path generator, generate path function according to geoJson
-                // transformation, no context => svg
-                // as we'll use the svg to draw on canvas after
-                const path = d3.geoPath().projection(projection)
-                //.context(context)
-
-                // -------------------
-                // Create an in memory only element of type 'custom'
-                var detachedContainer = document.createElement('custom')
-                // Create a d3 selection for the detached container. We won't actually be attaching it to the DOM.
-                var dataContainer = d3.select(detachedContainer)
+                setMap(map)
 
                 d3.json(source).then((data) => {
                     // If the data may change, ie add / remove nodes
                     // see https://bocoup.com/blog/d3js-and-canvas
 
-                    // In this example, the data doesn't change
-                    var dataBinding = dataContainer
-                        .selectAll('custom.path')
-                        .data(data.features, function (d) {
-                            return d
-                        })
-
-                    // Custom node for each element
-                    dataBinding
-                        .enter()
-                        .append('path')
-                        .attr('d', (feature) => path(feature)) // d = svp path string encoded
-                        .attr('stroke', 'black')
-                        .attr('fill', 'transparent')
-
-                    var path2DElements = []
-
-                    function drawCanvas() {
-                        context.clearRect(
-                            0,
-                            0,
-                            map.getSize().x,
-                            map.getSize().y
-                        )
-
-                        path2DElements = []
-                        // For each fictive path elements, draw it on the canvas
-                        // with the appropriate attributes, bind with d3
-                        var elements = dataContainer.selectAll('path')
-                        elements.each(function (d) {
-                            // store path
-                            var node = d3.select(this)
-
-                            // draw path
-                            // without context, path(d) is an svg path
-                            // need to render it as a canvas path
-                            const p = generatePath2D(d, path)
-                            context.stroke(p)
-                            path2DElements.push({ path2D: p, feature: d })
-
-                            // Add text centroid
-                            context.font = '20px serif'
-                            context.fillStyle = 'red'
-                            context.fillText(
-                                `${d.id}`,
-                                path.centroid(d)[0],
-                                path.centroid(d)[1]
-                            )
-                        })
-                    }
-
-                    drawCanvas()
-
-                    canvasLayer.on('update', (e) => {
-                        context.save()
-                        context.clearRect(
-                            0,
-                            0,
-                            map.getSize().x,
-                            map.getSize().y
-                        )
-                        drawCanvas()
-                        context.restore()
-                    })
-
-                    canvas.on('mousemove', (e) => {
-                        let bound = canvas.node().getBoundingClientRect() // in case canvas is not at top left
-                        let x = e.pageX - bound.left
-                        let y = e.pageY - bound.top
-                        for (let i = 0; i < path2DElements.length; i++) {
-                            if (
-                                context.isPointInPath(
-                                    transformPath2DWithCanvasStyle(
-                                        path2DElements[i].path2D,
-                                        canvas.attr('style'),
-                                        canvas.attr('width')
-                                    ),
-                                    map.mouseEventToLayerPoint(e).x,
-                                    map.mouseEventToLayerPoint(e).y
-                                )
-                            ) {
-                                console.log(path2DElements[i].feature.id)
-                            }
-                        }
-                    })
+                    // Here data doesn't change
+                    setData(data.features)
                 })
-
-                setMap(map)
             })
         }
     })
