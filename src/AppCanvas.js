@@ -172,7 +172,12 @@ const AppCanvas = () => {
                     // see https://bocoup.com/blog/d3js-and-canvas
 
                     // Here data doesn't change
-                    setData(data.features)
+                    setData(
+                        data.features.map((feature, i) => ({
+                            ...feature,
+                            id: i,
+                        }))
+                    )
                 })
             })
         }
