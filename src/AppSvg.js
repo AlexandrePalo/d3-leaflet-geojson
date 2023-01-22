@@ -16,7 +16,12 @@ const AppSvg = () => {
     useEffect(() => {
         L = require('leaflet')
         // Map creation
-        if (!mapElement) {
+        if (
+            !mapElement &&
+            !document
+                .getElementById('map')
+                .classList.contains('leaflet-container')
+        ) {
             const origin = [37.8, -96.9]
             const initialZoom = 4
 
